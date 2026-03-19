@@ -37,29 +37,29 @@ data/train.csv
 
 We use a Bayesian linear regression model:
 
-\[
+$$
 y \sim N(X\beta, \sigma^2)
-\]
+$$
 
 where
 
-- \(y\) is the log price
-- \(X\) is the design matrix of predictors
-- \(\beta\) are regression coefficients
-- \(\sigma^2\) is the residual variance
+- $y$ is the log price
+- $X$ is the design matrix of predictors
+- $\beta$ are regression coefficients
+- $\sigma^2$ is the residual variance
 
 ### Priors
 
 Weakly informative priors are used:
 
-- \(\beta \sim N(0, \tau^2 I)\)
-- \(\sigma^2 \sim \text{Inverse-Gamma}(a,b)\)
+- $\beta \sim N(0, \tau^2 I)$
+- $\sigma^2 \sim \text{Inverse-Gamma}(a,b)$
 
 with
 
-- \(\tau^2 = 100^2\)
-- \(a = 0.01\)
-- \(b = 0.01\)
+- $\tau^2 = 100^2$
+- $a = 0.01$
+- $b = 0.01$
 
 Posterior samples are generated using a Gibbs sampler.
 
