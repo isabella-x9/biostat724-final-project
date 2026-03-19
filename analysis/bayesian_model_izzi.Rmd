@@ -1,0 +1,326 @@
+---
+title: "Bayesian Model Analysis"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# 1. Overview
+
+This section implements the Bayesian regression model for used-car prices. 
+Exploratory analysis and initial data cleaning were performed separately.
+
+Goal: 
+
+-   estimate the effect of vehicle characteristics on used-car price
+
+-   quantify uncertainty in these effects using posterior distributions
+
+-   generate predictive distributions for car prices
+
+We model **log(price)** because raw prices are right-skewed.
+
+
+# 2. Load packages 
+
+```{r }
+library(tidyverse)
+library(janitor)
+library(forcats)
+library(MASS)
+library(coda)
+```
+
+
+# 3. Load and prepare data
+
+```{r }
+cars <- read_csv("../data/train.csv") %>%
+  clean_names()
+```
+
+We start from the cleaned dataset used in the exploratory analysis.
+
+## 3.1 Restrict to Major Brands
+```{r }
+top_brands <- c(
+  "BMW","Ford","Mercedes-Benz","Chevrolet","Audi","Porsche",
+  "Toyota","Lexus","Jeep","Land","Cadillac","Nissan"
+)
+
+cars_top <- cars %>%
+  filter(brand %in% top_brands)
+```
+
+## 3.2 Create Modeling Variables
+
+We construct simplified variables for regression.
+```{r }
+cars_model <- cars_top %>%
+  mutate(
+    log_price = log(price),
+
+    accident_bin = if_else(grepl("None", accident),0,1),
+
+    trans_auto = if_else(
+      grepl("Automatic|A/T|CVT|Dual", transmission, ignore.case = TRUE),
+      1,0
+    ),
+
+    milage_std = as.numeric(scale(milage)),
+    model_year_std = as.numeric(scale(model_year))
+  )
+```
+
+Continuous predictors are standardized to improve numerical stability.
+
+## 3.3 Remove Missing Values
+
+For simplicity, we use complete-case analysis. 
+```{r }
+cars_model <- cars_model %>%
+  drop_na(
+    log_price,
+    milage_std,
+    model_year_std,
+    accident_bin,
+    trans_auto,
+    fuel_type,
+    brand
+  )
+```
+
+
+# 4. Construct the Design Matrix
+
+We build the regression design matrix using selected predictors. 
+```{r }
+X <- model.matrix(
+  ~ milage_std + model_year_std + accident_bin + trans_auto + fuel_type + brand,
+  data = cars_model
+)
+
+y <- cars_model$log_price
+
+n <- nrow(X)
+p <- ncol(X)
+```
+
+
+# 5. Bayesian Model Setup 
+
+Model: 
+$$
+y \sim N(X\beta,\sigma^2)
+$$
+Priors:
+
+-   $\beta \sim N(0,\tau^2 I)$
+
+-   $\sigma^2 \sim IG(a,b)$ 
+
+```{r }
+tau2 <- 100^2
+a0 <- 0.01
+b0 <- 0.01
+```
+
+These are weakly informative priors.
+
+
+# 6. Gibbs Sampling
+
+We implement Gibbs sampling using the conjugate full conditional distributions.
+```{r }
+set.seed(724)
+
+n_iter <- 12000
+burn <- 2000
+
+beta_draws <- matrix(NA,n_iter,p)
+sigma2_draws <- numeric(n_iter)
+
+beta <- rep(0,p)
+sigma2 <- var(y)
+
+XtX <- t(X)%*%X
+Xty <- t(X)%*%y
+Ip <- diag(p)
+
+for(i in 1:n_iter){
+
+  Vb <- solve(XtX/sigma2 + Ip/tau2)
+  mb <- Vb %*% (Xty/sigma2)
+
+  beta <- as.numeric(MASS::mvrnorm(1,mb,Vb))
+
+  resid <- y - X%*%beta
+
+  a_n <- a0 + n/2
+  b_n <- b0 + sum(resid^2)/2
+
+  sigma2 <- 1/rgamma(1,a_n,b_n)
+
+  beta_draws[i,] <- beta
+  sigma2_draws[i] <- sigma2
+}
+
+beta_post <- beta_draws[(burn+1):n_iter,]
+sigma2_post <- sigma2_draws[(burn+1):n_iter]
+
+colnames(beta_post) <- colnames(X)
+```
+
+
+# 7. MCMC Diagnostics
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
+
+
+
+```{r }
+
+```
