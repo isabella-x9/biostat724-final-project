@@ -1,0 +1,24 @@
+"0","# Bayesian Regression for Used-Car Price Distribution"
+"0","# Data Loading, Cleaning & Descriptive Statistics"
+"0",""
+"0","#Libraries & data"
+"0","library(tidyverse)   # loads dplyr, ggplot2, readr, etc."
+"0","library(tibble)"
+"0","library(knitr)"
+"0","library(janitor)"
+"0","library(corrplot)"
+"0",""
+"0","cars <- read_csv(""../data/train.csv"")"
+"1","[1mRows: [22m[34m54273[39m [1mColumns: [22m[34m13[39m
+"
+"1","[36m──[39m [1mColumn specification[22m [36m──────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "",""
+[31mchr[39m (9): brand, model, fuel_type, engine, transmission, ext_col, int_col, accident...
+[32mdbl[39m (4): id, model_year, milage, price
+"
+"1","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message.
+"
+"0","# Initial look at the data"
+"0","head(cars)"
