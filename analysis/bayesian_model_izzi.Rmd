@@ -181,10 +181,215 @@ colnames(beta_post) <- colnames(X)
 
 # 7. MCMC Diagnostics
 
+We use trace plots and posterior density plots to examine convergence and mixing.
 
-
+## 7.1 Prepare posterior samples for plotting
 ```{r }
+beta_df <- as.data.frame(beta_post)
+beta_df$iteration <- 1:nrow(beta_df)
 
+beta_long <- beta_df %>%
+  pivot_longer(
+    cols = -iteration,
+    names_to = "parameter",
+    values_to = "value"
+  ) %>%
+  mutate(
+    parameter = recode(
+      parameter,
+      "(Intercept)" = "Intercept",
+      "milage_std" = "Mileage (standardized)",
+      "model_year_std" = "Model Year (standardized)",
+      "accident_bin" = "Accident History",
+      "trans_auto" = "Automatic Transmission",
+      "fuel_typeDiesel" = "Fuel: Diesel",
+      "fuel_typeElectric" = "Fuel: Electric",
+      "fuel_typeGasoline" = "Fuel: Gasoline",
+      "fuel_typeHybrid" = "Fuel: Hybrid",
+      "fuel_typePlug-In Hybrid" = "Fuel: Plug-In Hybrid"
+    )
+  )
+```
+
+## 7.2 Trace plots for selected coefficients
+
+We inspect trace plots for a subset of key regression coefficients.
+```{r }
+selected_params <- c(
+  "Intercept",
+  "Mileage (standardized)",
+  "Model Year (standardized)",
+  "Accident History",
+  "Automatic Transmission",
+  "Fuel: Diesel"
+)
+
+beta_long %>%
+  filter(parameter %in% selected_params) %>%
+  filter(iteration %% 5 == 0) %>%
+  ggplot(aes(x = iteration, y = value)) +
+  geom_line(linewidth = 0.3, alpha = 0.7) +
+  facet_wrap(~ parameter, scales = "free_y", ncol = 2) +
+  labs(
+    title = "Trace Plots for Selected Regression Coefficients",
+    x = "MCMC Iteration",
+    y = "Posterior Draw"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 7.3 Trace plot for residual variance
+```{r }
+sigma_df <- tibble(
+  iteration = 1:length(sigma2_post),
+  sigma2 = sigma2_post
+)
+
+sigma_df %>%
+  filter(iteration %% 5 == 0) %>%
+  ggplot(aes(x = iteration, y = sigma2)) +
+  geom_line(linewidth = 0.3, alpha = 0.7) +
+  labs(
+    title = "Trace Plot for Residual Variance",
+    x = "MCMC Iteration",
+    y = expression(sigma^2)
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 7.4 Posterior density plots
+
+Density plots summarize uncertainty in selected coefficients. 
+```{r }
+beta_long %>%
+  filter(parameter %in% selected_params) %>%
+  ggplot(aes(x = value)) +
+  geom_density(alpha = 0.4, fill = "steelblue") +
+  facet_wrap(~ parameter, scales = "free", ncol = 2) +
+  labs(
+    title = "Posterior Density Plots for Selected Coefficients",
+    x = "Coefficient Value",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+
+# 8. Posterior Summaries
+
+We summarize posterior means, standard deviations, and 95% credible intervals.
+```{r }
+beta_summary <- apply(beta_post, 2, function(x) {
+  c(
+    mean = mean(x),
+    sd = sd(x),
+    q025 = unname(quantile(x, 0.025)),
+    q975 = unname(quantile(x, 0.975))
+  )
+}) %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("parameter") %>%
+  mutate(
+    parameter = recode(
+      parameter,
+      "(Intercept)" = "Intercept",
+      "milage_std" = "Mileage (standardized)",
+      "model_year_std" = "Model Year (standardized)",
+      "accident_bin" = "Accident History",
+      "trans_auto" = "Automatic Transmission",
+      "fuel_typeDiesel" = "Fuel: Diesel",
+      "fuel_typeElectric" = "Fuel: Electric",
+      "fuel_typeGasoline" = "Fuel: Gasoline",
+      "fuel_typeHybrid" = "Fuel: Hybrid",
+      "fuel_typePlug-In Hybrid" = "Fuel: Plug-In Hybrid"
+    )
+  )
+
+beta_summary
+```
+
+## 8.1 Coefficient plot with 95% credible intervals
+
+This plot shows posterior means and corresponding credible intervals.
+```{r }
+beta_summary %>%
+  mutate(parameter = reorder(parameter, mean)) %>%
+  ggplot(aes(x = mean, y = parameter)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = q025, xmax = q975), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Posterior Means and 95% Credible Intervals",
+    x = "Posterior Estimate",
+    y = "Parameter"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+
+# 9. Posterior Predictive Analysis
+
+We generate posterior predictive draws for the observed vehicles. 
+```{r }
+y_rep <- matrix(NA, nrow = nrow(beta_post), ncol = n)
+
+for (s in 1:nrow(beta_post)) {
+  mu <- X %*% beta_post[s, ]
+  y_rep[s, ] <- rnorm(n, mean = mu, sd = sqrt(sigma2_post[s]))
+}
+
+pred_log <- colMeans(y_rep)
+
+pred_price <- exp(pred_log)
+obs_price <- exp(y)
+```
+
+## 9.1 Observed vs predicted prices
+```{r }
+pred_df <- tibble(
+  observed_price = obs_price,
+  predicted_price = pred_price
+)
+
+ggplot(pred_df, aes(x = observed_price, y = predicted_price)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(
+    title = "Observed vs Predicted Prices",
+    x = "Observed Price",
+    y = "Predicted Price"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 9.2 Observed and predicted log-price distributions
+```{r }
+dist_df <- tibble(
+  observed_log_price = y,
+  predicted_log_price = pred_log
+) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "type",
+    values_to = "log_price"
+  ) %>%
+  mutate(
+    type = recode(
+      type,
+      "observed_log_price" = "Observed",
+      "predicted_log_price" = "Predicted"
+    )
+  )
+
+ggplot(dist_df, aes(x = log_price, fill = type)) +
+  geom_density(alpha = 0.4) +
+  labs(
+    title = "Observed and Predicted Log-Price Distributions",
+    x = "Log Price",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 13)
 ```
 
 
@@ -195,132 +400,5 @@ colnames(beta_post) <- colnames(X)
 
 
 
-```{r }
 
-```
 
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
-
-
-
-```{r }
-
-```
